@@ -17,13 +17,14 @@ public class TimeSeriesTest {
 		SimpleDateFormat formatter = new SimpleDateFormat("MM/yyyy");
 		Date startDate = formatter.parse("01/1949");
 		TimeSeriesFactory tsFactory = new TimeSeriesFactoryImpl();
-		TimeSeries ts = tsFactory.createTimeSeries(TimeSeries.R_COMPATIBLE, name, startDate, freq, data);
+		TimeSeries ts = tsFactory.createTimeSeries(TimeSeries.R_COMPATIBLE, name, startDate
+				,Seasonality.MONTH_OF_YEAR, data);
 		
 		
 		double delta = 0.0001;
 		//Assert.assertEquals("Class Name must be TimeSeriesR","TimeSeriesR",ts.getClass().getName());
 		Assert.assertEquals("Frequency must be 12", freq, ts.getFrequency(), delta);
-		Assert.assertArrayEquals("Matching data",data, data,delta);
+		Assert.assertArrayEquals("Matching data",data, ts.getData(),delta);
 		Assert.assertEquals("Start Date must be Jan 1949",startDate.toString(),ts.getStartDate().toString());
 		
 	}

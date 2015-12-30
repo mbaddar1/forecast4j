@@ -17,12 +17,12 @@ public class RForecastEngine implements ForecastEngine {
 		Rconn = new RConnection();
 		
 	}
-	private void destory() {
+	private void destroy() {
 		Rconn.close();
 	}
 	@Override
 	public ForecastResult SES_forecast(TimeSeries training, int horizon) {
-		// TODO Auto-generated method stub
+		
 		return null;
 	}
 
