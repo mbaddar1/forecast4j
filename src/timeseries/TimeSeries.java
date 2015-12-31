@@ -1,5 +1,6 @@
 package timeseries;
 
+import java.time.ZonedDateTime;
 import java.util.Date;
 
 public abstract class TimeSeries {
@@ -12,20 +13,21 @@ public abstract class TimeSeries {
 	public static final double NA_FREQ = -1;
 	/**************/
 	private String name;
-	private Date startDate;
 	private double frequency; //frequency can't be set externally , set based on seasonlity
 	private Seasonality seasonality;
 	private double[] data;
+	private ZonedDateTime[] index;
+	
 	/**
 	 * @param name 
 	 * @param startDate
 	 * @param frequency
 	 * @param data
 	 */
-	protected TimeSeries(String name , Date startDate ,Seasonality seasonlity , double[] data)
+	protected TimeSeries(String name ,Seasonality seasonlity 
+			, double[] data,ZonedDateTime[] index)
 	{
 		this.name = name;
-		this.startDate = startDate;
 		this.seasonality = seasonlity;
 		
 		switch(seasonlity) {
@@ -41,9 +43,17 @@ public abstract class TimeSeries {
 		default :
 			throw new IllegalArgumentException("Seasonlity = "+seasonlity+" is not supported");		
 		}
+		if(data.length != index.length)
+			throw new IllegalArgumentException("data length is not equal to index length, data length = "
+							+data.length+" index length = "+index.length);
+		
 		this.data = new double[data.length];
-		for(int i=0;i<data.length;i++)
-			this.data[i]=data[i];
+		this.index = new ZonedDateTime[index.length];
+		for(int i=0;i<data.length;i++) {
+			this.data[i] = data[i];
+			this.index[i] = index[i];
+		}
+			
 	}
 	public Seasonality getSeasonality() {
 		return seasonality;
@@ -51,11 +61,12 @@ public abstract class TimeSeries {
 	protected String getName() {
 		return name;
 	}
-	protected Date getStartDate() {
-		return startDate;
-	}
+	
 	protected double[] getData() {
 		return data;
+	}
+	public ZonedDateTime[] getIndex() {
+		return index;
 	}
 	protected double getFrequency(){
 		return frequency;

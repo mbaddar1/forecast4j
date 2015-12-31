@@ -1,15 +1,16 @@
 package timeseries;
 
+import java.time.ZonedDateTime;
 import java.util.Date;
 
 public class TimeSeriesFactoryImpl implements TimeSeriesFactory {
 
 	@Override
-	public TimeSeries createTimeSeries(int timeSeriesType, String name,
-			Date startDate, Seasonality seasonality, double[] data) {
+	public TimeSeries createTimeSeries(int timeSeriesType, String name,Seasonality seasonality
+			, double[] data,ZonedDateTime[] index) {
 		switch (timeSeriesType) {
 		case TimeSeries.R_COMPATIBLE: {
-			return new RTimeSeries(name, startDate, seasonality, data);
+			return new RTimeSeries(name,seasonality, data,index);
 		}
 
 		default: {
