@@ -14,5 +14,11 @@ public abstract class DateTimeConverters {
 		return (zdt.getYear()+"-"+zdt.getMonthValue()+"-"+zdt.getDayOfMonth()+" "
 						+zdt.getHour()+":"+zdt.getMinute()+":"+zdt.getSecond());
 	}
-
+	
+	public static String[] convertZonedDateTimeToRtimeDateStr(ZonedDateTime[] zdtArr) {
+		String[] rtdArr = new String[zdtArr.length];
+		for(int i=0;i<zdtArr.length;i++)
+			rtdArr[i] = convertZonedDateTimeToRtimeDateStr(zdtArr[i]);
+		return rtdArr;
+	}
 }
