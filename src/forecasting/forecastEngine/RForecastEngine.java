@@ -22,7 +22,7 @@ public class RForecastEngine implements ForecastEngine {
 	}
 	@Override
 	public ForecastResult SES_forecast(TimeSeries training, int horizon) {
-		
+			
 		return null;
 	}
 
