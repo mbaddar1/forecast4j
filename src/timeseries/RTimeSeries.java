@@ -75,6 +75,23 @@ public class RTimeSeries extends TimeSeries {
 		}
 		return ret;
 	}
-	
+	/**
+	 * 
+	 * @param rconn
+	 * @param xtsInstanceName
+	 * @return
+	 */
+	private boolean verifyRxts(RConnection rconn,String xtsInstanceName) {
+		boolean check = true;
+		return check;
+	}
+	private boolean verifyRxtsData(RConnection rconn,String xtsInstanceName) {
+		boolean check = true;
+		return check;
+	}
+	private boolean verifyRxtsTimeDateIndex(RConnection rconn,String xtsInstanceName) {
+		boolean check = true;
+		return check;
+	}
 	
 }
