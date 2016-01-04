@@ -13,7 +13,7 @@ import org.rosuda.REngine.Rserve.RConnection;
 
 public class RTimeSeriesTest {
 	@Test
-	public void testCreateRxtsInWorkSpace1() throws REngineException, REXPMismatchException {
+	public void testCreateRxtsInWorkSpace1() throws Exception {
 		
 		double[] data ={112.0,118,132,129,121,135,148,148,136,119,104,118,115,
 				126,141,135,125,149,170,170,158,133,114,140};
