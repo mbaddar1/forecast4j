@@ -31,7 +31,7 @@ public class RTimeSeriesTest {
 		RTimeSeries rts = (RTimeSeries) tsFactory.createTimeSeries(TimeSeries.R_COMPATIBLE
 				,name,Seasonality.MONTH_OF_YEAR, data, index);
 		RConnection conn = new RConnection();
-		REXP r = rts.createRxtsInWorkSpace(conn, "demand.xts",false);
+		REXP r = rts.createRxtsInWorkSpace(conn, "demand.xts",true);
 		conn.close();
 		Assert.assertFalse("Check if retrun is not string error meassage", r.isString());
 	}

@@ -3,9 +3,12 @@ package timeseries;
 import java.time.ZonedDateTime;
 import java.util.Date;
 
+import org.junit.Assert;
 import org.rosuda.REngine.REXP;
+import org.rosuda.REngine.REXPDouble;
 import org.rosuda.REngine.REXPLogical;
 import org.rosuda.REngine.REXPMismatchException;
+import org.rosuda.REngine.REXPString;
 import org.rosuda.REngine.REngineException;
 import org.rosuda.REngine.Rserve.RConnection;
 import org.rosuda.REngine.Rserve.RserveException;
@@ -73,6 +76,11 @@ public class RTimeSeries extends TimeSeries {
 		else {
 			System.out.println("R xts: "+xtsInstanceName+" set successfully");
 		}
+		if(withVerfication)
+		{
+			if(!verifyRxts(rconn, xtsInstanceName))
+				ret = new REXPString("VerificationError");
+		}
 		return ret;
 	}
 	/**
@@ -80,13 +88,29 @@ public class RTimeSeries extends TimeSeries {
 	 * @param rconn
 	 * @param xtsInstanceName
 	 * @return
+	 * @throws REXPMismatchException 
+	 * @throws RserveException 
 	 */
-	private boolean verifyRxts(RConnection rconn,String xtsInstanceName) {
+	private boolean verifyRxts(RConnection rconn,String xtsInstanceName) throws RserveException, REXPMismatchException {
 		boolean check = true;
+		if(!verifyRxtsData(rconn, xtsInstanceName))
+			return false;
 		return check;
 	}
-	private boolean verifyRxtsData(RConnection rconn,String xtsInstanceName) {
+	private boolean verifyRxtsData(RConnection rconn,String xtsInstanceName) throws RserveException, REXPMismatchException {
 		boolean check = true;
+		REXP r1 = rconn.eval("as.numeric("+xtsInstanceName+")");
+		
+		if(!r1.isNumeric())
+			throw new RserveException(rconn, "Return of as.numeric("+xtsInstanceName+") is not numeric.");
+		double[] d = r1.asDoubles();
+		Assert.assertArrayEquals("Comparing R xts data with Java time series data"
+				, this.getData(), d, 0.0001);
+		if(d.length!=this.getData().length)
+			check = false;
+		for(int i=0;i<d.length;i++)
+			if(d[i]!=this.getData()[i])
+				check = false;
 		return check;
 	}
 	private boolean verifyRxtsTimeDateIndex(RConnection rconn,String xtsInstanceName) {
