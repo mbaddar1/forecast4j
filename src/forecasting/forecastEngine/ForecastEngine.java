@@ -21,9 +21,11 @@ public interface ForecastEngine {
 	public ForecastResult ETS_forecast(TimeSeries training, int horizon,
 			ETS_Parameters params);
 
-	// Forecasting with covariates
+	// Forecasting with regressors
 	public ForecastResult CochraneOrchutt_forecast(TimeSeries training,
 			int horizon, CochraneOrchuttParameters params);
+	
+	public ForecastResult RegARIMAerr(TimeSeries ts,int horizon);
 	
 	//TODO Add and implement other forecasting methods (ARIMA and its variants,Bayesian)
 
