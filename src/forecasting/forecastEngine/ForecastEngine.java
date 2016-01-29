@@ -1,5 +1,10 @@
 package forecasting.forecastEngine;
 
+import forecasting.forecastEngine.forecastParameters.ArimaParameters;
+import forecasting.forecastEngine.forecastParameters.AutoArimaParameters;
+import forecasting.forecastEngine.forecastParameters.CochraneOrcuttParameters;
+import forecasting.forecastEngine.forecastParameters.ETSparameters;
+import forecasting.forecastEngine.forecastParameters.HoltWinterParameters;
 import timeseries.TimeSeries;
 
 /**
@@ -13,20 +18,29 @@ import timeseries.TimeSeries;
 public interface ForecastEngine {
 
 	// Exponential Smoothing
-	public ForecastResult SES_forecast(TimeSeries training, int horizon);
+	public ForecastResult sesForecast(TimeSeries training, int horizon);
 
-	public ForecastResult HoltWinter_forecast(TimeSeries training, int horizon,
+	public ForecastResult holtWinterForecast(TimeSeries training, int horizon,
 			HoltWinterParameters params);
 
-	public ForecastResult ETS_forecast(TimeSeries training, int horizon,
-			ETS_Parameters params);
+	public ForecastResult etsForecast(TimeSeries training, int horizon,
+			ETSparameters params);
 
 	// Forecasting with regressors
-	public ForecastResult CochraneOrchutt_forecast(TimeSeries training,
-			int horizon, CochraneOrchuttParameters params);
+	public ForecastResult cochraneOrcuttForecast(TimeSeries training,
+			int horizon, CochraneOrcuttParameters params);
+	/**
+	 * 
+	 * @param ts time series to create model for
+	 * @param regressors Array of time series , each correspond to one of the regressors
+	 * 			all regressor's time series should have the same length 
+	 *forecasting horizon = length of any time series in regressors
+	 * @return instance of {@link ForecastResult}
+	 */
+	public ForecastResult regArimaErr(TimeSeries ts,TimeSeries[] regressors
+			,ArimaParameters params);
+	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] regressors
+			,AutoArimaParameters params);
 	
-	public ForecastResult RegARIMAerr(TimeSeries ts,int horizon);
-	
-	//TODO Add and implement other forecasting methods (ARIMA and its variants,Bayesian)
-
+	boolean checkRegressorsParams(TimeSeries[] regressors);
 }
