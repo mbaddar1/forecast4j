@@ -1,5 +1,6 @@
 package forecasting.forecastEngine;
 
+import org.rosuda.REngine.REXP;
 import org.rosuda.REngine.Rserve.RConnection;
 import org.rosuda.REngine.Rserve.RserveException;
 
@@ -9,7 +10,10 @@ import forecasting.forecastEngine.forecastParameters.CochraneOrcuttParameters;
 import forecasting.forecastEngine.forecastParameters.ETSparameters;
 import forecasting.forecastEngine.forecastParameters.HoltWinterParameters;
 import rconfig.RConfig;
+import timeseries.RTimeSeries;
 import timeseries.TimeSeries;
+import timeseries.TimeSeriesFactory;
+import timeseries.TimeSeriesFactoryImpl;
 
 public class RForecastEngine implements ForecastEngine {
 
@@ -64,9 +68,13 @@ public class RForecastEngine implements ForecastEngine {
 
 	@Override
 	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] regressors
-			,AutoArimaParameters params) {
-		// TODO Auto-generated method stub
-		
+			,AutoArimaParameters params) throws Exception {
+		//create time series
+		TimeSeriesFactory tsFac = new TimeSeriesFactoryImpl();
+		RTimeSeries rts = (RTimeSeries) tsFac.createTimeSeries(TimeSeries.R_COMPATIBLE, ts.getName(), ts.getSeasonality()
+				, ts.getData(), ts.getIndex());
+		String rtsName = rts.getName()+".train.ts";
+		rts.createRxtsInWorkSpace(Rconn, rtsName, true);
 		return null;
 	}
 

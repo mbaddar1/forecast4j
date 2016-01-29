@@ -40,7 +40,7 @@ public interface ForecastEngine {
 	public ForecastResult regArimaErr(TimeSeries ts,TimeSeries[] regressors
 			,ArimaParameters params);
 	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] regressors
-			,AutoArimaParameters params);
+			,AutoArimaParameters params) throws Exception;
 	
 	boolean checkRegressorsParams(TimeSeries[] regressors);
 }

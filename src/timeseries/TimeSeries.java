@@ -58,14 +58,15 @@ public abstract class TimeSeries {
 	public Seasonality getSeasonality() {
 		return seasonality;
 	}
+	
 	public int getLength() {
 		return data.length;
 	}
-	protected String getName() {
+	public String getName() {
 		return name;
 	}
 	
-	protected double[] getData() {
+	public double[] getData() {
 		return data;
 	}
 	public ZonedDateTime[] getIndex() {
