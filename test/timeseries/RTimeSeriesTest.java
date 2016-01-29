@@ -1,5 +1,5 @@
-package timeseries;
 
+package timeseries;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
