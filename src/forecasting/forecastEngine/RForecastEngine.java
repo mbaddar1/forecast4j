@@ -72,7 +72,22 @@ public class RForecastEngine implements ForecastEngine {
 
 	@Override
 	public boolean checkRegressorsParams(TimeSeries[] regressors) {
-		
+		if(regressors == null)
+			throw new NullPointerException("regressors is null");
+		int numReg = regressors.length;
+		/**
+		 * Check equal length for all regressors time series
+		 */
+		if(numReg >1) {
+			for(int i=1;i<regressors.length;i++) {
+				if(regressors[i].getLength() !=regressors[0].getLength())
+					throw new IllegalArgumentException("Unequal length for regressors:"
+							+ "regressor[0] length = "+regressors[0].getLength()
+							+"regressor["+i+"] length = "+regressors[i].getLength());
+			}
+		}
+		else
+			return true;
 		return false;
 	}
 
