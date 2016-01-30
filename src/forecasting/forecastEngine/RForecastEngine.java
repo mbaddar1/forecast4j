@@ -1,6 +1,8 @@
 package forecasting.forecastEngine;
 
 import org.rosuda.REngine.REXP;
+import org.rosuda.REngine.REXPMismatchException;
+import org.rosuda.REngine.REngineException;
 import org.rosuda.REngine.Rserve.RConnection;
 import org.rosuda.REngine.Rserve.RserveException;
 
@@ -79,25 +81,72 @@ public class RForecastEngine implements ForecastEngine {
 	}
 
 	@Override
-	public boolean checkRegressorsParams(TimeSeries[] regressors) {
-		if(regressors == null)
+	public boolean checkTsArrParams(TimeSeries[] tsArr) {
+		if(tsArr == null)
 			throw new NullPointerException("regressors is null");
-		int numReg = regressors.length;
+		int numReg = tsArr.length;
 		/**
-		 * Check equal length for all regressors time series
+		 * Check equal length for all tsArr time series
 		 */
 		if(numReg >1) {
-			for(int i=1;i<regressors.length;i++) {
-				if(regressors[i].getLength() !=regressors[0].getLength())
+			for(int i=1;i<tsArr.length;i++) {
+				if(tsArr[i].getLength() !=tsArr[0].getLength())
 					throw new IllegalArgumentException("Unequal length for regressors:"
-							+ "regressor[0] length = "+regressors[0].getLength()
-							+"regressor["+i+"] length = "+regressors[i].getLength());
+							+ "regressor[0] length = "+tsArr[0].getLength()
+							+"regressor["+i+"] length = "+tsArr[i].getLength());
 			}
 		}
 		else
-			return true;
-		return false;
+			return true; //one time series only
+		return true; //no exception thrown , return true
 	}
-
-
+	
+	//Auxiliary methods
+	/**
+	 * Convert kxn time series array , where k is number of array element , n is the length of any
+	 * time series in the array (assuming all time series have the same length) to nxk R matrix
+	 * the created matrix is in the workspace attached with Rconn
+	 * for example
+	 * input tsArr :
+	 * tsArr[0] : 1 2 3 4
+	 * tsArr[1] : 5 6 7 8
+	 * matrix should be
+	 * m :
+	 * 1 5
+	 * 2 6
+	 * 3 7
+	 * 4 8
+ 	 * @param tsArr : array of time series
+	 * @param name : name of matrix to create
+	 * @return boolean to indicate the status of matrix creation
+	 * @throws REXPMismatchException 
+	 * @throws REngineException 
+	 */
+	public boolean createRmatrix(TimeSeries[] tsArr,String name) throws REXPMismatchException
+					, REngineException {
+		if(checkTsArrParams(tsArr))
+		{
+			int k = tsArr.length;
+			int n = tsArr[0].getLength();
+			double[] matData = new double[n*k];
+			/**create matrix data array in column wise manner
+			 * R stores data column wise
+			 */
+			for(int j=0;j<k;j++)
+				for(int i=0;i<n;i++)
+					matData[j*n+i] = tsArr[j].getData()[i];
+			
+			//create matrix in R
+			String dataVecName = name+".data";
+			Rconn.assign(dataVecName, matData);
+			String expr = "try(expr = {"+name+" = matrix("+dataVecName+" = "
+					+ ",nrow = "+n+",ncol = "+k+",byrow = FALSE)})";
+			REXP r = Rconn.eval(expr);
+			if(r.isString())
+				throw new RserveException(Rconn, "Error in creating matrix :"+r.asString());
+			
+		}
+		return true;
+		
+	}
 }

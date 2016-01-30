@@ -41,6 +41,11 @@ public interface ForecastEngine {
 			,ArimaParameters params);
 	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] regressors
 			,AutoArimaParameters params) throws Exception;
-	
-	boolean checkRegressorsParams(TimeSeries[] regressors);
+	/**
+	 * check array of time series for multiple checks (equal length for each time 
+	 * series and others)
+	 * @param tsArr : array of time series
+	 * @return boolean result of check
+	 */
+	boolean checkTsArrParams(TimeSeries[] tsArr);
 }
