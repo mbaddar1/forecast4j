@@ -20,11 +20,13 @@ import timeseries.TimeSeriesFactoryImpl;
 public class RForecastEngine implements ForecastEngine {
 
 	private RConnection Rconn;
-	private RConfig rConfig;
-	public RForecastEngine() {
-		// TODO Auto-generated constructor stub
-	}
+	
 
+	private RConfig rConfig;
+	public RForecastEngine(RConfig rConfig) throws RserveException {
+		initialize(rConfig);
+	}
+	
 	private void initialize(RConfig rConfig) throws RserveException {
 		Rconn = new RConnection();
 		this.rConfig= rConfig;
@@ -33,6 +35,7 @@ public class RForecastEngine implements ForecastEngine {
 	private void destroy() {
 		Rconn.close();
 	}
+	
 	@Override
 	public ForecastResult sesForecast(TimeSeries training, int horizon) {
 			
@@ -139,8 +142,8 @@ public class RForecastEngine implements ForecastEngine {
 			//create matrix in R
 			String dataVecName = name+".data";
 			Rconn.assign(dataVecName, matData);
-			String expr = "try(expr = {"+name+" = matrix("+dataVecName+" = "
-					+ ",nrow = "+n+",ncol = "+k+",byrow = FALSE)})";
+			String expr = "try(expr = {"+name+" = matrix( data = "+dataVecName
+					+ ", nrow = "+n+",ncol = "+k+",byrow = FALSE)})";
 			REXP r = Rconn.eval(expr);
 			if(r.isString())
 				throw new RserveException(Rconn, "Error in creating matrix :"+r.asString());
@@ -148,5 +151,14 @@ public class RForecastEngine implements ForecastEngine {
 		}
 		return true;
 		
+	}
+	/**
+	 * Evaluate expression
+	 * @param name
+	 * @return
+	 * @throws REngineException
+	 */
+	public REXP evalExpr(String expr) throws REngineException {
+		return Rconn.eval(expr);
 	}
 }
