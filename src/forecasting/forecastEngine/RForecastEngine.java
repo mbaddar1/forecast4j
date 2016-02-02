@@ -1,6 +1,9 @@
 package forecasting.forecastEngine;
 
+import java.util.MissingResourceException;
+
 import org.rosuda.REngine.REXP;
+import org.rosuda.REngine.REXPLogical;
 import org.rosuda.REngine.REXPMismatchException;
 import org.rosuda.REngine.REngineException;
 import org.rosuda.REngine.Rserve.RConnection;
@@ -72,14 +75,46 @@ public class RForecastEngine implements ForecastEngine {
 	}
 
 	@Override
-	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] regressors
-			,AutoArimaParameters params) throws Exception {
+	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] trainingRegressors
+			,TimeSeries[] futureRegressors,AutoArimaParameters params) throws Exception {
 		//create time series
 		TimeSeriesFactory tsFac = new TimeSeriesFactoryImpl();
-		RTimeSeries rts = (RTimeSeries) tsFac.createTimeSeries(TimeSeries.R_COMPATIBLE, ts.getName(), ts.getSeasonality()
-				, ts.getData(), ts.getIndex());
+		RTimeSeries rts = (RTimeSeries) tsFac.createTimeSeries(TimeSeries.R_COMPATIBLE, ts.getName()
+				, ts.getSeasonality(), ts.getData(), ts.getIndex());
 		String rtsName = rts.getName()+".train.ts";
-		rts.createRxtsInWorkSpace(Rconn, rtsName, true);
+		//create time series
+		rts.createRxtsInWorkSpace(Rconn, rtsName, false);
+		//create regressors
+		String trainingRegressorsName = "trainingRegressors";
+		createRmatrix(trainingRegressors, trainingRegressorsName);
+		
+		//create r auto.arima expression
+		//using forecast 6.1
+		//make sure forecasting library is loaded
+		String expr = "require(forecast)";
+		REXP r = Rconn.eval(expr);
+		if(!(r.isLogical() && ((REXPLogical)r).isTRUE()[0]==true))
+			throw new RserveException(Rconn, "Can't load forecast library in R session.");
+		String modelName = "model";
+		expr = "try(expr = {"+modelName+" = auto.arima(x = "+rtsName+",xreg = "+trainingRegressorsName+")})";
+		r = Rconn.eval(expr);
+		if(r.isString())
+			throw new RserveException(Rconn, "Error returned from auto.arima "+r.asString());
+		//get summary of model
+		expr = "capture.output(summary("+modelName+"))";
+		r = Rconn.eval(expr);
+		String output[] = r.asStrings();
+		for(int i=0;i<output.length;i++)
+			System.out.println(output[i]);
+		//Generate forecasting
+		//Generate future regressors matrix
+		
+		String futureRegressorsName = "futureRegressors";
+		createRmatrix(futureRegressors, futureRegressorsName);
+		expr = "try(expr = {forecast.Arima(object = "+modelName+",xreg = "+futureRegressorsName+")})";
+		r = Rconn.eval(expr);
+		if(r.isString())
+			throw new RserveException(Rconn, "Error returned from forecast.Arima "+r.asString());
 		return null;
 	}
 
@@ -108,7 +143,7 @@ public class RForecastEngine implements ForecastEngine {
 	/**
 	 * Convert kxn time series array , where k is number of array element , n is the length of any
 	 * time series in the array (assuming all time series have the same length) to nxk R matrix
-	 * the created matrix is in the workspace attached with Rconn
+	 * the created matrix is in the workspace attached with RForecastEngineInstance
 	 * for example
 	 * input tsArr :
 	 * tsArr[0] : 1 2 3 4

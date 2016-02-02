@@ -39,8 +39,8 @@ public interface ForecastEngine {
 	 */
 	public ForecastResult regArimaErr(TimeSeries ts,TimeSeries[] regressors
 			,ArimaParameters params);
-	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] regressors
-			,AutoArimaParameters params) throws Exception;
+	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] trainingRegressors
+			,TimeSeries[] futureRegressors,AutoArimaParameters params) throws Exception;
 	/**
 	 * check array of time series for multiple checks (equal length for each time 
 	 * series and others)
