@@ -22,14 +22,17 @@ import datetime.converters.DateTimeConverters;
  * 
  * @author baddar
  *implementation of time series that is compatible with R
- *RTimeSeries is designed to mimic the design of xts in R , and to be compatible with it
+ *RTimeSeries is designed to mimic the design of ts in R , and to be compatible with it
  */
 public class RTimeSeries extends TimeSeries {
-
+	
+	RConnection rconn;
 	public RTimeSeries(String name,Seasonality seasonality,
 			double[] data,ZonedDateTime[] index) {
 		super(name, seasonality, data,index);
+		this.rconn = rconn;
 	}
+	@Deprecated
 	/**
 	 * Create xts time series in the given workspace with the given name based on the current time series
 	 * data and index
@@ -205,5 +208,10 @@ public class RTimeSeries extends TimeSeries {
 			throw new IllegalArgumentException(component +" is not accepted timeDate component");
 		}
 		return check;
+	}
+	@Override
+	protected double[] imputeMissing(String imputationMethod) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

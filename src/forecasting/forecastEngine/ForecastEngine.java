@@ -39,13 +39,20 @@ public interface ForecastEngine {
 	 */
 	public ForecastResult regArimaErr(TimeSeries ts,TimeSeries[] regressors
 			,ArimaParameters params);
-	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] trainingRegressors
-			,TimeSeries[] futureRegressors,AutoArimaParameters params) throws Exception;
-	/**
-	 * check array of time series for multiple checks (equal length for each time 
-	 * series and others)
-	 * @param tsArr : array of time series
-	 * @return boolean result of check
-	 */
+	
 	boolean checkTsArrParams(TimeSeries[] tsArr);
+	
+	/**
+	 * 
+	 * @param ts time series to create model for
+	 * @param regressors Array of time series , each correspond to one of the regressors
+	 * 			all regressor's time series should have the same length 
+	 *forecasting horizon = length of any time series in regressors
+	 *@param timeIndexGranularity string : can be "days" , "weeks" , "months" , "quarters" , "years"
+	 * @return instance of {@link ForecastResult}
+	 */
+	ForecastResult regAutoArimaErr(TimeSeries ts,
+			TimeSeries[] trainingRegressors, TimeSeries[] futureRegressors,
+			AutoArimaParameters params, String timeIndexGranularity,int horizon)
+			throws Exception;
 }

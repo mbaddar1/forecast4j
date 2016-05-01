@@ -27,6 +27,12 @@
   		<artifactId>Rserve</artifactId>
   		<version>1.8.1</version>
   	</dependency>
+  	<dependency>
+    	<groupId>org.apache.commons</groupId>
+    	<artifactId>commons-csv</artifactId>
+    <version>1.2</version>
+</dependency>
   </dependencies>
+  
   <artifactId>forecast4j</artifactId>
 </project>

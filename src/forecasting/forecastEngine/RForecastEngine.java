@@ -1,5 +1,7 @@
 package forecasting.forecastEngine;
 
+import java.nio.file.FileSystem;
+import java.time.ZonedDateTime;
 import java.util.MissingResourceException;
 
 import org.rosuda.REngine.REXP;
@@ -16,6 +18,7 @@ import forecasting.forecastEngine.forecastParameters.ETSparameters;
 import forecasting.forecastEngine.forecastParameters.HoltWinterParameters;
 import rconfig.RConfig;
 import timeseries.RTimeSeries;
+import timeseries.Seasonality;
 import timeseries.TimeSeries;
 import timeseries.TimeSeriesFactory;
 import timeseries.TimeSeriesFactoryImpl;
@@ -76,46 +79,161 @@ public class RForecastEngine implements ForecastEngine {
 
 	@Override
 	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] trainingRegressors
-			,TimeSeries[] futureRegressors,AutoArimaParameters params) throws Exception {
-		//create time series
-		TimeSeriesFactory tsFac = new TimeSeriesFactoryImpl();
-		RTimeSeries rts = (RTimeSeries) tsFac.createTimeSeries(TimeSeries.R_COMPATIBLE, ts.getName()
-				, ts.getSeasonality(), ts.getData(), ts.getIndex());
-		String rtsName = rts.getName()+".train.ts";
-		//create time series
-		rts.createRxtsInWorkSpace(Rconn, rtsName, false);
-		//create regressors
-		String trainingRegressorsName = "trainingRegressors";
-		createRmatrix(trainingRegressors, trainingRegressorsName);
+			,TimeSeries[] futureRegressors,AutoArimaParameters params,String dateTimeIndexStep ,
+			int horizon) throws Exception {
+		//create training data frame
+		String trainingDataFrameRName = "train.ts.df";
+		String dateTimeColName = "date.time.idx";
+		createTrainingDataFrame(Rconn, ts, trainingRegressors,dateTimeColName,trainingDataFrameRName);
 		
-		//create r auto.arima expression
-		//using forecast 6.1
-		//make sure forecasting library is loaded
-		String expr = "require(forecast)";
+		//debugging code
+//		String dexpr = "capture.output("+trainingDataFrameRName+")";
+//		REXP dr = Rconn.eval(dexpr);
+//		for(int i=0;i<dr.length();i++)
+//			System.out.println(dr.asStrings()[i]);
+		
+		String[] regressorsNames = null;
+		if(trainingRegressors!=null){
+			regressorsNames = new String[trainingRegressors.length];
+			for(int i=0;i<regressorsNames.length;i++)
+				regressorsNames[i] = trainingRegressors[i].getName();
+		}
+		String regressorsColsNamesR = "regressors.col.names.vec";
+		Rconn.assign(regressorsColsNamesR,regressorsNames);
+		
+		String rAutoArimaModelName = "auto.arima.model";
+		String custAutoArimaRScriptName= "custAutoArima.R";
+		//TODO add system file separator
+		custAutoArimaRScriptName = rConfig.getrScriptsPath()+"/"+custAutoArimaRScriptName;
+		String expr =  "source(\""+custAutoArimaRScriptName+"\")";
+		
+		expr = "try(expr = {"+expr+"})";
 		REXP r = Rconn.eval(expr);
-		if(!(r.isLogical() && ((REXPLogical)r).isTRUE()[0]==true))
-			throw new RserveException(Rconn, "Can't load forecast library in R session.");
-		String modelName = "model";
-		expr = "try(expr = {"+modelName+" = auto.arima(x = "+rtsName+",xreg = "+trainingRegressorsName+")})";
-		r = Rconn.eval(expr);
-		if(r.isString())
-			throw new RserveException(Rconn, "Error returned from auto.arima "+r.asString());
-		//get summary of model
-		expr = "capture.output(summary("+modelName+"))";
-		r = Rconn.eval(expr);
-		String output[] = r.asStrings();
-		for(int i=0;i<output.length;i++)
-			System.out.println(output[i]);
-		//Generate forecasting
-		//Generate future regressors matrix
 		
-		String futureRegressorsName = "futureRegressors";
-		createRmatrix(futureRegressors, futureRegressorsName);
-		expr = "try(expr = {forecast.Arima(object = "+modelName+",xreg = "+futureRegressorsName+")})";
+		if(r.isString())
+			throw new RserveException(Rconn, "Error in evaluating expression : "+expr+" =>"+r.asString());
+		String aaSeason = null;
+		switch(ts.getSeasonality()) {
+		case MONTH_OF_YEAR:
+			aaSeason = "my";
+			break;
+		case QUARTER_OF_YEAR :
+			aaSeason = "qy";
+			break;
+		default :
+			throw new IllegalArgumentException("Undefined seasonlity =>"+ts.getSeasonality());
+		}
+		if(trainingRegressors == null) {
+			expr = rAutoArimaModelName+"= auto.arima.cust(train.df = "+trainingDataFrameRName+
+					",seasonality = "+aaSeason+",dataTimeCol = \""+dateTimeColName+
+					"\",targetCol = \""+ts.getName()+"\", regressorsCols = NULL)";
+		}
+		else {
+			expr = rAutoArimaModelName+"= auto.arima.cust(train.df = "+trainingDataFrameRName+
+					",seasonality = \""+aaSeason+"\",dataTimeCol = \""+dateTimeColName+
+					"\",targetCol = \""+ts.getName()+"\", regressorsCols = "+regressorsColsNamesR+")";
+		}
+		expr = "try(expr = {"+expr+"})";
 		r = Rconn.eval(expr);
 		if(r.isString())
-			throw new RserveException(Rconn, "Error returned from forecast.Arima "+r.asString());
-		return null;
+			throw new RserveException(Rconn, "Error in evaluating expression :"+expr+" = >"+r.asString());
+		System.out.println("Successfully created arima model");
+		//Forecast
+		expr = "require(forecast)";
+		r = Rconn.eval(expr);
+		if(((REXPLogical)r).isFALSE()[0])
+			throw new RserveException(Rconn, "Error in "+expr);
+		
+		String forecastResultRName = "auto.arima.forecast.res";
+		if(trainingRegressors ==null)
+		{
+			expr = forecastResultRName +" = forecast.Arima(object = "+rAutoArimaModelName+",h = "+horizon+")";
+			expr = "try(expr = {"+expr+"})";
+			r = Rconn.eval(expr);
+			if(r.isString())
+				throw new RserveException(Rconn, "Error evaluating expr :"+expr+" => "+r.asString());
+		}
+		else {
+			String futureRegressorsMatrixNameR = "future.regressors";
+			createRmatrix(futureRegressors, futureRegressorsMatrixNameR);
+			
+			expr = forecastResultRName +" = forecast.Arima(object = "+rAutoArimaModelName+
+					",xreg = "+futureRegressorsMatrixNameR+")";
+			expr = "try(expr = {"+expr+"})";
+			r = Rconn.eval(expr);
+			if(r.isString())
+				throw new RserveException(Rconn, "Error evaluating expr :"+expr+" => "+r.asString());
+		}
+		expr = "as.vector("+forecastResultRName+"$mean)";
+		expr = "try(expr = {"+expr+"})";
+		r = Rconn.eval(expr);
+		if(r.isString())
+			throw new RserveException(Rconn, "Error in getting mean forecast");
+		double[] mean_forecast = r.asDoubles();
+		
+		expr = "as.vector("+forecastResultRName+"$lower[,1])";
+		expr = "try(expr = {"+expr+"})";
+		r = Rconn.eval(expr);
+		if(r.isString())
+			throw new RserveException(Rconn, "Error in getting lower forecast");
+		double[] lower_forecast = r.asDoubles();
+		
+		expr = "as.vector("+forecastResultRName+"$upper[,1])";
+		expr = "try(expr = {"+expr+"})";
+		r = Rconn.eval(expr);
+		if(r.isString())
+			throw new RserveException(Rconn, "Error in getting upper forecast");
+		double[] upper_forecast = r.asDoubles();
+		
+		expr = "as.vector("+forecastResultRName+"$method)";
+		r = Rconn.eval(expr);
+		String method = r.asString();
+		
+		expr = "as.vector("+forecastResultRName+"$level)";
+		r = Rconn.eval(expr);
+		if(r.isString())
+			throw new RserveException(Rconn, "Error in getting upper forecast");
+		double[] levels= r.asDoubles();
+		
+		//create mean time series
+		//get the starting index of the forecast values
+		ZonedDateTime lastTrainZDT = ts.getIndex()[ts.getLength()-1];
+		ZonedDateTime[] forecastIndex = new ZonedDateTime[mean_forecast.length];
+		
+		if(dateTimeIndexStep.equalsIgnoreCase("day")) {
+			forecastIndex[0] = lastTrainZDT.plusDays(1);
+			for(int i=1;i<mean_forecast.length;i++)
+				forecastIndex[i] = forecastIndex[i-1].plusDays(1);
+		}
+		else if(dateTimeIndexStep.equalsIgnoreCase("week")) {
+			forecastIndex[0] = lastTrainZDT.plusWeeks(1);
+			for(int i=1;i<mean_forecast.length;i++)
+				forecastIndex[i] = forecastIndex[i-1].plusWeeks(1);
+		}
+		else if(dateTimeIndexStep.equalsIgnoreCase("month")) {
+			forecastIndex[0] = lastTrainZDT.plusMonths(1);
+			for(int i=1;i<mean_forecast.length;i++)
+				forecastIndex[i] = forecastIndex[i-1].plusMonths(1);
+		}
+		else if(dateTimeIndexStep.equalsIgnoreCase("quarter")) {
+			forecastIndex[0] = lastTrainZDT.plusMonths(3);
+			for(int i=1;i<mean_forecast.length;i++)
+				forecastIndex[i] = forecastIndex[i-1].plusMonths(3);
+		}
+		else if(dateTimeIndexStep.equalsIgnoreCase("year")) {
+			forecastIndex[0] = lastTrainZDT.plusYears(1);
+			for(int i=1;i<mean_forecast.length;i++)
+				forecastIndex[i] = forecastIndex[i-1].plusYears(1);
+		}
+		else
+			throw new IllegalArgumentException("Unsupported date time index step : "+dateTimeIndexStep);
+		TimeSeriesFactory tsFac2 = new TimeSeriesFactoryImpl();
+		String forecastName = ts.getName()+".forecast";
+		TimeSeries meanForecastTS = tsFac2.createTimeSeries(TimeSeries.R_COMPATIBLE, forecastName,
+				ts.getSeasonality(), mean_forecast, forecastIndex);
+		ForecastResult forecastRes = new ForecastResult(method, meanForecastTS, lower_forecast, upper_forecast,
+				levels);
+		return forecastRes;
 	}
 
 	@Override
@@ -195,5 +313,71 @@ public class RForecastEngine implements ForecastEngine {
 	 */
 	public REXP evalExpr(String expr) throws REngineException {
 		return Rconn.eval(expr);
+	}
+	
+	//should be private
+	//dataframe structure 
+	//DateTimeIndex trainTS (Y) Regressors(X)
+	public static boolean createTrainingDataFrame(RConnection Rconn,TimeSeries trainTS,
+			TimeSeries[] regressors,String dataTimeIndexColName,String dataFrameName) 
+					throws REngineException, REXPMismatchException 
+	{
+		//assume that no missing data exists
+		//TODO handle missing data
+		
+		//create DateTime index vector
+		int len = trainTS.getData().length;
+		String format = "%Y-%m-%d";
+		String[] dateTimeIndexChrVec = new String[len];
+		for(int i=0;i<len;i++)
+		{
+			dateTimeIndexChrVec[i] = convertZDTtoRPOSIXltStr(trainTS.getIndex()[i], format);
+		}
+		String dateTimeIndexChrRName = dataTimeIndexColName+".chr";
+		String tmpRDataVecName = "tmp.data";
+		
+		Rconn.assign(dateTimeIndexChrRName, dateTimeIndexChrVec);
+		
+		String expr = tmpRDataVecName+" = as.POSIXct(x = strptime(x = "+dateTimeIndexChrRName+
+				" ,format = \""+format+"\"))";
+		expr = "try(expr = {"+expr+"})";
+		REXP ret = Rconn.eval(expr);
+		if(ret.isString())
+			throw new RserveException(Rconn, "Error in evaluating expr : "+expr+" =>"+ret.asString() );
+		
+		expr = "try(expr = { "+dataFrameName+" = data.frame("+dataTimeIndexColName+" = "+tmpRDataVecName+")})";
+		ret = Rconn.eval(expr);
+		if(ret.isString())
+			throw new RserveException(Rconn, "Error in evaluating expr : "+expr+" =>"+ret.asString() );
+		
+		
+		Rconn.assign(tmpRDataVecName,trainTS.getData());
+		expr = dataFrameName +" = cbind("+dataFrameName+","+trainTS.getName()+"="+tmpRDataVecName+")";
+		expr = "try(expr = {"+expr+"})";
+		ret = Rconn.eval(expr);
+		
+		if(ret.isString())
+			throw new RserveException(Rconn, "Error in evaluating expr : "+expr+" =>"+ret.asString() );
+		for(int i=0;i<regressors.length;i++)
+		{
+			Rconn.assign(tmpRDataVecName,regressors[i].getData());
+			expr = dataFrameName +" = cbind("+dataFrameName+","+regressors[i].getName()+"="+tmpRDataVecName+")";
+			expr = "try(expr = {"+expr+"})";
+			ret = Rconn.eval(expr);
+			if(ret.isString())
+				throw new RserveException(Rconn, "Error in evaluating expr : "+expr+" =>"+ret.asString() );
+		}
+		return true;
+	}
+	public static String convertZDTtoRPOSIXltStr(ZonedDateTime zdt,String format) {
+		String tmp = format;
+		tmp = tmp.replace("%Y",	String.valueOf(zdt.getYear()));
+		tmp = tmp.replace("%m", String.valueOf(zdt.getMonthValue()));
+		tmp = tmp.replace("%d", String.valueOf(zdt.getDayOfMonth()));
+		tmp = tmp.replace("%H", String.valueOf(zdt.getHour()));
+		tmp = tmp.replace("%M", String.valueOf(zdt.getMinute()));
+		tmp = tmp.replace("%S", String.valueOf(zdt.getSecond()));
+		
+		return tmp;
 	}
 }
