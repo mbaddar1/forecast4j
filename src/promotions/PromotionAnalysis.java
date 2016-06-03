@@ -4,22 +4,22 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class PromotionAnalysis {
-	private Map<Promotion, Double> promotionEffect;
+	private Map<String, Double> promotionEffect;
 	public PromotionAnalysis() {
-		promotionEffect = new HashMap<Promotion, Double>();
+		promotionEffect = new HashMap<String, Double>();
 	}
-	public void addPromotionEffect(Promotion promo,Double effect) throws Exception {
-		if(promotionEffect.containsKey(promo)) {
+	public void addPromotionEffect(String promoName,Double effect) throws Exception {
+		if(promotionEffect.containsKey(promoName)) {
 			throw new Exception("Adding duplicate promotion");
 		}
-		promotionEffect.put(promo, effect);
+		promotionEffect.put(promoName, effect);
 	}
-	public double getPromotionEffect(Promotion promo) throws Exception {
-		if(promotionEffect.containsKey(promo)) {
-			return promotionEffect.get(promo);
+	public double getPromotionEffect(String promoName) throws Exception {
+		if(promotionEffect.containsKey(promoName)) {
+			return promotionEffect.get(promoName);
 		}
 		else {
-			throw new Exception("Promotion :"+promo+" is not in this PromotionAnalysis instance");
+			throw new IllegalArgumentException("Promotion :"+promoName+" is not in this PromotionAnalysis instance");
 		}
 	}
 }

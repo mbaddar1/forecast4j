@@ -16,6 +16,7 @@ import forecasting.forecastEngine.forecastParameters.AutoArimaParameters;
 import forecasting.forecastEngine.forecastParameters.CochraneOrcuttParameters;
 import forecasting.forecastEngine.forecastParameters.ETSparameters;
 import forecasting.forecastEngine.forecastParameters.HoltWinterParameters;
+import r.RHelper;
 import rconfig.RConfig;
 import timeseries.RTimeSeries;
 import timeseries.Seasonality;
@@ -80,11 +81,11 @@ public class RForecastEngine implements ForecastEngine {
 	@Override
 	public ForecastResult regAutoArimaErr(TimeSeries ts,TimeSeries[] trainingRegressors
 			,TimeSeries[] futureRegressors,AutoArimaParameters params,String dateTimeIndexStep ,
-			int horizon) throws Exception {
+			int horizon,String timeZone) throws Exception {
 		//create training data frame
 		String trainingDataFrameRName = "train.ts.df";
 		String dateTimeColName = "date.time.idx";
-		createTrainingDataFrame(Rconn, ts, trainingRegressors,dateTimeColName,trainingDataFrameRName);
+		createTrainingDataFrame(Rconn, ts, trainingRegressors,dateTimeColName,trainingDataFrameRName,timeZone);
 		
 		//debugging code
 //		String dexpr = "capture.output("+trainingDataFrameRName+")";
@@ -93,13 +94,15 @@ public class RForecastEngine implements ForecastEngine {
 //			System.out.println(dr.asStrings()[i]);
 		
 		String[] regressorsNames = null;
+		String regressorsColsNamesR = null;
 		if(trainingRegressors!=null){
 			regressorsNames = new String[trainingRegressors.length];
 			for(int i=0;i<regressorsNames.length;i++)
 				regressorsNames[i] = trainingRegressors[i].getName();
+			regressorsColsNamesR = "regressors.col.names.vec";
+			Rconn.assign(regressorsColsNamesR,regressorsNames);
 		}
-		String regressorsColsNamesR = "regressors.col.names.vec";
-		Rconn.assign(regressorsColsNamesR,regressorsNames);
+		
 		
 		String rAutoArimaModelName = "auto.arima.model";
 		String custAutoArimaRScriptName= "custAutoArima.R";
@@ -125,7 +128,7 @@ public class RForecastEngine implements ForecastEngine {
 		}
 		if(trainingRegressors == null) {
 			expr = rAutoArimaModelName+"= auto.arima.cust(train.df = "+trainingDataFrameRName+
-					",seasonality = "+aaSeason+",dataTimeCol = \""+dateTimeColName+
+					",seasonality = \""+aaSeason+"\",dataTimeCol = \""+dateTimeColName+
 					"\",targetCol = \""+ts.getName()+"\", regressorsCols = NULL)";
 		}
 		else {
@@ -319,7 +322,7 @@ public class RForecastEngine implements ForecastEngine {
 	//dataframe structure 
 	//DateTimeIndex trainTS (Y) Regressors(X)
 	public static boolean createTrainingDataFrame(RConnection Rconn,TimeSeries trainTS,
-			TimeSeries[] regressors,String dataTimeIndexColName,String dataFrameName) 
+			TimeSeries[] regressors,String dataTimeIndexColName,String dataFrameName,String timeZone) 
 					throws REngineException, REXPMismatchException 
 	{
 		//assume that no missing data exists
@@ -337,14 +340,12 @@ public class RForecastEngine implements ForecastEngine {
 		String tmpRDataVecName = "tmp.data";
 		
 		Rconn.assign(dateTimeIndexChrRName, dateTimeIndexChrVec);
-		
 		String expr = tmpRDataVecName+" = as.POSIXct(x = strptime(x = "+dateTimeIndexChrRName+
-				" ,format = \""+format+"\"))";
+				" ,format = \""+format+"\",tz = \""+timeZone+"\"))";
 		expr = "try(expr = {"+expr+"})";
 		REXP ret = Rconn.eval(expr);
 		if(ret.isString())
 			throw new RserveException(Rconn, "Error in evaluating expr : "+expr+" =>"+ret.asString() );
-		
 		expr = "try(expr = { "+dataFrameName+" = data.frame("+dataTimeIndexColName+" = "+tmpRDataVecName+")})";
 		ret = Rconn.eval(expr);
 		if(ret.isString())
@@ -358,14 +359,18 @@ public class RForecastEngine implements ForecastEngine {
 		
 		if(ret.isString())
 			throw new RserveException(Rconn, "Error in evaluating expr : "+expr+" =>"+ret.asString() );
-		for(int i=0;i<regressors.length;i++)
-		{
-			Rconn.assign(tmpRDataVecName,regressors[i].getData());
-			expr = dataFrameName +" = cbind("+dataFrameName+","+regressors[i].getName()+"="+tmpRDataVecName+")";
-			expr = "try(expr = {"+expr+"})";
-			ret = Rconn.eval(expr);
-			if(ret.isString())
-				throw new RserveException(Rconn, "Error in evaluating expr : "+expr+" =>"+ret.asString() );
+		if (regressors!=null) {
+			for (int i = 0; i < regressors.length; i++) {
+				Rconn.assign(tmpRDataVecName, regressors[i].getData());
+				expr = dataFrameName + " = cbind(" + dataFrameName + ","
+						+ regressors[i].getName() + "=" + tmpRDataVecName + ")";
+				expr = "try(expr = {" + expr + "})";
+				ret = Rconn.eval(expr);
+				if (ret.isString())
+					throw new RserveException(Rconn,
+							"Error in evaluating expr : " + expr + " =>"
+									+ ret.asString());
+			}
 		}
 		return true;
 	}

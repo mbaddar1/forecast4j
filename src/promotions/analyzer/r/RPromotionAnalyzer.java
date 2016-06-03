@@ -1,7 +1,6 @@
 package promotions.analyzer.r;
 
 import java.io.File;
-
 import java.io.FileNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,6 +12,7 @@ import org.rosuda.REngine.Rserve.RserveException;
 
 import data.TransactionsTable;
 import data.r.RTransactionsTable;
+import promotions.Promotion;
 import promotions.PromotionAnalysis;
 import promotions.analyzer.PromotionAnalyzer;
 import r.RHelper;
@@ -20,20 +20,20 @@ import rconfig.RConfig;
 import r.RHelper.*;
 //TODO Modify RTransactionTable , to avoid using its own Rconnection to avoid incosistency
 public class RPromotionAnalyzer implements PromotionAnalyzer {
-	RConnection rconn;
-	RConfig rconf;
-	String logPrefix;
-	public RPromotionAnalyzer(RConnection rconn,RConfig rconf) {
+	private RConnection rconn;
+	private RConfig rconf;
+	private static final String logPrefix = "log_";
+	private String promotionAnalysisRscriptName;
+	public RPromotionAnalyzer(RConnection rconn,RConfig rconf,String promotionAnalysisRscriptName) {
 		this.rconn = rconn;
-		this.logPrefix = "log_";
 		this.rconf = rconf;
+		this.promotionAnalysisRscriptName = promotionAnalysisRscriptName;
 	}
 	@Override
 	public PromotionAnalysis analyze(TransactionsTable transactionTable,String qtyColName,
 			String[] pricesColNames,String[] logicalPromoColNames) throws Exception {
 		RTransactionsTable rTransTable = (RTransactionsTable)transactionTable;
 		RConnection tableRconn = rTransTable.getRconn();
-		String promotionAnalysisRscriptName = "PromotionAnalysis.R";
 		if(tableRconn != this.rconn)
 			throw new IllegalArgumentException("Rconnection of transaction table is not the same as "
 					+ "passed rconnection.");
@@ -45,7 +45,7 @@ public class RPromotionAnalyzer implements PromotionAnalyzer {
 		if (!Files.exists(path)) {
 		  throw new FileNotFoundException("Rscript :"+promotionAnalysisRscriptPath+" cannot be found");
 		}
-		String expr = "source(+"+promotionAnalysisRscriptName+")";
+		String expr = "source('"+promotionAnalysisRscriptPath+"')";
 		REXP r = RHelper.evalWithTryCatch(this.rconn, expr);
 		//Calculate promotions
 		String promoAnalysisResultRName = "promo.analysis";
@@ -54,13 +54,33 @@ public class RPromotionAnalyzer implements PromotionAnalyzer {
 		genPreProcessedRTransactionTable(rconn,rTransTable,preprocessedRTransTableName, qtyColName,
 				pricesColNames, logicalPromoColNames);
 		String fmla = genRLogLogDemandFormula(qtyColName, pricesColNames, logicalPromoColNames,
-				preprocessedRTransTableName);
+				logPrefix);
 		expr = promoAnalysisResultRName +" = analyze.promotions(formula = "+fmla+",transactions = "+
 				preprocessedRTransTableName+")";
+		RHelper.evalWithTryCatch(tableRconn, expr);
+		
+		//consume promotion analysis to get a dataframe of the effects
+		String promoAnalysisDataFrameRName = "promo.analysis.df";
+		expr = promoAnalysisDataFrameRName+" = consume.promo.analysis("+promoAnalysisResultRName+")";
+		RHelper.evalWithTryCatch(tableRconn, expr);
+		RHelper.printRVar(tableRconn, promoAnalysisDataFrameRName);
+		String promotionDataFrameColName = "promotion"; // related to R code of consume.promo.analysis
+		String effectDataFrameColName = "effect"; // related to R code of consume.promo.analysis
+		//get names of promotions
+		expr = promoAnalysisDataFrameRName+"[,\""+promotionDataFrameColName+"\"]";
+		r = tableRconn.eval(expr);
+		String[] promoNames = r.asStrings();
+		//get effects of promotions
+		expr = promoAnalysisDataFrameRName+"[,'"+effectDataFrameColName+"']";
 		r = RHelper.evalWithTryCatch(tableRconn, expr);
-		return null;
+		double[] effects = r.asDoubles();
+		PromotionAnalysis promoAnalysis = new PromotionAnalysis();
+		for(int i=0;i<promoNames.length;i++) {
+			promoAnalysis.addPromotionEffect(promoNames[i], effects[i]);
+		}
+		return promoAnalysis;
 	}
-	public String genPreProcessedRTransactionTable (RConnection rconn,RTransactionsTable rTransTable,
+	public boolean genPreProcessedRTransactionTable (RConnection rconn,RTransactionsTable rTransTable,
 			String preprocessedRTransTableName,String qtyColName,String[] pricesColNames,
 			String[] logicalPromoColNames) {
 		
@@ -70,10 +90,12 @@ public class RPromotionAnalyzer implements PromotionAnalyzer {
 			String expr = preprocessedRTransTableName+"$log_"+qtyColName+" = "+"log("+
 					preprocessedRTransTableName+"$"+qtyColName+")";
 			//Log prices
-			REXP r = RHelper.evalWithTryCatch(rconn, expr);
+			RHelper.evalWithTryCatch(rconn, expr);
 			for(int i=0;i<pricesColNames.length;i++) {
 				expr = preprocessedRTransTableName+"$log_"+pricesColNames[i]+" = "+"log("+
 						preprocessedRTransTableName+"$"+pricesColNames[i]+")";
+				
+				RHelper.evalWithTryCatch(rconn, expr);
 			};
 			
 		} catch (RserveException e) {
@@ -83,14 +105,29 @@ public class RPromotionAnalyzer implements PromotionAnalyzer {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-				return null;
-		//take log for price columns
-		
+		return true;		
 	}
 	public String genRLogLogDemandFormula(String qtyColName,String[] pricesColNames,
 			String[] logicalPromoColNames,String logPrefix) {
-		String fmla = logPrefix+qtyColName+ " ~ ";
-		for(int i=0;i<pricesColNames.length ;i++) {
+		//parameter checking
+		String fmla = "";
+		if(qtyColName == null || qtyColName.isEmpty()) {
+			throw new NullPointerException("Quantity column name can't be null");
+		}
+		if(  (pricesColNames ==null || pricesColNames.length ==0)  && (logicalPromoColNames == null || logicalPromoColNames.length==0)) {
+			throw new IllegalArgumentException("Prices column names and logical promotion columns names can't be both null or empty.");
+		}
+		if((pricesColNames !=null) && (pricesColNames.length !=0)) {
+			fmla = logPrefix+qtyColName+ " ~ "+logPrefix+pricesColNames[0];
+		}
+		else if((logicalPromoColNames != null) && (logicalPromoColNames.length!=0)) {
+			fmla = logPrefix+qtyColName+ " ~ "+logPrefix+logicalPromoColNames[0];
+		}
+		else {
+			throw new IllegalArgumentException("Prices column names and logical promotion columns names can't be both null or empty.");
+		}
+		
+		for(int i=1;i<pricesColNames.length ;i++) {
 			fmla = fmla + " + " +logPrefix+pricesColNames[i];
 		}
 		for(int i=0;i<logicalPromoColNames.length;i++)

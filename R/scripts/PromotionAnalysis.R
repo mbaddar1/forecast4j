@@ -28,7 +28,7 @@ consume.promo.analysis <-function(promo.analysis) {
     summ = summary(model)
     coeff = summ$coefficients
     coeff.row.names = rownames(coeff)
-    promo.effect = data.frame(promo = coeff.row.names
+    promo.effect = data.frame(promotion = coeff.row.names
                               ,effect = vector(mode = "numeric"
                               ,length = nrow(coeff))
                               ,stringsAsFactors = F)

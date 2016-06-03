@@ -108,10 +108,10 @@ public class RForecastEngineTest {
 				,0.594778066,0.545328307,1.85567861,0.882341774,0.479144681,1.302357376,0.451389832,0.149334878,0.392083863,0.548559897,1.430770981
 				,1.973964634,-2.308604067,-0.057706851,-0.969060881,0.063290188,-1.392556217,-0.144713401
 		};
-		
+		String timeZone = "GMT";
 		double[] futureIncomeData = {1.1871651,1.3543547,0.5611698,0.3710579};
 		int horizon = 4;
-		ZonedDateTime trainStartZonedDateTime = ZonedDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC"));
+		ZonedDateTime trainStartZonedDateTime = ZonedDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneId.of(timeZone));
 		ZonedDateTime[] trainIndex = new ZonedDateTime[trainConsumptionData.length];
 		ZonedDateTime[] futureIndex = new ZonedDateTime[futureIncomeData.length];
 		/**
@@ -148,7 +148,7 @@ public class RForecastEngineTest {
 		rconf.setrScriptsPath("/home/baddar/git/forecast4j/R/scripts");
 		RForecastEngine reng = (RForecastEngine) fengFac.createEngine(ForecastEngineFactory.REngine
 				,rconf);
-		ForecastResult fres = reng.regAutoArimaErr(trainConsumptionTS, trainRegressors,futureRegressors, null,"quarter",horizon);
+		ForecastResult fres = reng.regAutoArimaErr(trainConsumptionTS, trainRegressors,futureRegressors, null,"quarter",horizon,timeZone);
 		
 		double[] expectedMeanForecast = {0.8413029,0.8664852,0.6849065,0.6469838};
 		Assert.assertArrayEquals("Test forecasting mean",expectedMeanForecast
@@ -161,7 +161,7 @@ public class RForecastEngineTest {
 		
 		//Asserting time indices
 		ZonedDateTime[] expectedForecastIndex = new ZonedDateTime[4];
-		expectedForecastIndex[0] = ZonedDateTime.of(2010, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC"));
+		expectedForecastIndex[0] = ZonedDateTime.of(2010, 1, 1, 0, 0, 0, 0, ZoneId.of(timeZone));
 		for(int i=1;i<expectedForecastIndex.length;i++)
 			expectedForecastIndex[i]=expectedForecastIndex[i-1].plusMonths(3);
 		
@@ -223,8 +223,9 @@ public class RForecastEngineTest {
 				0.479144681,1.302357376,0.451389832,0.149334878,0.392083863,0.548559897,1.430770981,1.973964634,-2.308604067,
 				-0.057706851,-0.969060881,0.063290188,-1.392556217,-0.144713401,1.187165135,1.354354721,
 				0.561169813,0.37105794};
+		String timeZone = "GMT";
 		ZonedDateTime[] zdtIndex = new ZonedDateTime[consumptionData.length];
-		zdtIndex[0] = ZonedDateTime.of(1970,1,1,0,0,0,0,ZoneId.of("GMT"));
+		zdtIndex[0] = ZonedDateTime.of(1970,1,1,0,0,0,0,ZoneId.of(timeZone));
 		for(int i=1;i<zdtIndex.length;i++) {
 			zdtIndex[i] = zdtIndex[i-1].plusMonths(3);
 		}
@@ -237,7 +238,7 @@ public class RForecastEngineTest {
 		String dataFrameName = "con.inc.df";
 		RConnection rconn = new RConnection();
 		String dateTimeColNameR = "date.time";
-		RForecastEngine.createTrainingDataFrame(rconn, consumptionTS, regressors,dateTimeColNameR, dataFrameName);
+		RForecastEngine.createTrainingDataFrame(rconn, consumptionTS, regressors,dateTimeColNameR, dataFrameName,timeZone);
 		
 		REXP ret = rconn.eval("capture.output("+dataFrameName+")");
 		String[] out = ret.asStrings();
@@ -277,4 +278,106 @@ public class RForecastEngineTest {
 		rconn.close();
 		
 	}
+	@Test
+	public void testAutoArimaWithRAirPassengersDataSetWithoutRegressors()
+	{
+		try {
+			/*Test forecasting with auto arima on R Air Passenger dataset , no regressors
+			 * training data is from 
+			 * 
+			 * R Script to create Train and Test data
+			 * 
+			 * rm(list = ls())
+			
+			testLen = 24
+			N = length(AirPassengers)
+			freq = frequency(AirPassengers)
+			trainData = AirPassengers[1:(N-testLen)]
+			testData = AirPassengers[(N-testLen+1):N]
+			train = ts(data = trainData,start = c(1949,1),frequency = freq)
+			test = ts(data = testData,start = c(1959,1),frequency = freq)
+			
+			train :
+			
+				Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
+			1949 112 118 132 129 121 135 148 148 136 119 104 118
+			1950 115 126 141 135 125 149 170 170 158 133 114 140
+			1951 145 150 178 163 172 178 199 199 184 162 146 166
+			1952 171 180 193 181 183 218 230 242 209 191 172 194
+			1953 196 196 236 235 229 243 264 272 237 211 180 201
+			1954 204 188 235 227 234 264 302 293 259 229 203 229
+			1955 242 233 267 269 270 315 364 347 312 274 237 278
+			1956 284 277 317 313 318 374 413 405 355 306 271 306
+			1957 315 301 356 348 355 422 465 467 404 347 305 336
+			1958 340 318 362 348 363 435 491 505 404 359 310 337
+			
+			test :
+				Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
+			1959 360 342 406 396 420 472 548 559 463 407 362 405
+			1960 417 391 419 461 472 535 622 606 508 461 390 432
+			 * */
+			//create training time series
+			String timeZone = "UTC";
+			double[] trainData = {112,118,132,129,121,135,148,148,136,119,104,118,115,126,141,135,
+						125,149,170,170,158,133,114,140,145,150,178,163,172,178,199,199,184,162,146,166,171,180,
+						193,181,183,218,230,242,209,191,172,194,196,196,236,235,229,243,264,272,237,211,180,201,
+						204,188,235,227,234,264,302,293,259,229,203,229,242,233,267,269,270,315,364,347,312,274,
+						237,278,284,277,317,313,318,374,413,405,355,306,271,306,315,301,356,348,355,422,465,467,
+						404,347,305,336,340,318,362,348,363,435,491,505,404,359,310,337};
+			double[] testData = {360,342,406,396,420,472,548,559,463,407,362,405,417,391,419,461,472,535,622,
+						606,508,461,390,432};
+			double[] expectedForecastMean = {342.288448383459,320.288448383459,364.288448383459,
+					350.288448383459,365.288448383459,437.288448383459,493.288448383459,507.288448383459,
+					406.288448383459,361.288448383459,312.288448383459,339.288448383459,344.576896766918,
+					322.576896766918,366.576896766918,352.576896766918,367.576896766918,439.576896766918,
+					495.576896766918,509.576896766918,408.576896766918,363.576896766918,314.576896766918,
+					341.576896766918};
+			double[] expectedForecastUpper80 = {355.296209077155,336.651659474634,383.427610229377,
+					371.849068854914,389.02477484869,463.017148953326,520.865955014113,536.598373509833,
+					437.233957748527,393.787331269082,346.269770131786,374.690186571197,386.758689819753,
+					369.197868667466,417.249634770219,407.000584004653,425.509176959832,500.817083279941,
+					559.955245611459,576.947388495485,478.812176445641,436.564607152626,390.216947157881,
+					419.779381247572};
+			double[] expectedForecastLower80 = {329.280687689763,303.925237292284,345.149286537541,
+					328.727827912004,341.552121918229,411.559747813592,465.710941752805,477.978523257085,
+					375.342939018391,328.789565497836,278.307126635132,303.886710195721,302.395103714083,
+					275.95592486637,315.904158763617,298.153209529183,309.644616574004,378.336710253895,
+					431.198547922378,442.206405038351,338.341617088195,290.58918638121,238.936846375955,
+					263.374412286264};
+			
+			ZonedDateTime[] trainIndex = new ZonedDateTime[trainData.length];
+			trainIndex[0] = ZonedDateTime.of(1949, 1, 1, 0, 0, 0, 0, ZoneId.of(timeZone));
+			for(int i=1;i<trainIndex.length;i++) {
+				trainIndex[i] = trainIndex[0].plusMonths(i);
+			}
+			ZonedDateTime[] testIndex = new ZonedDateTime[testData.length];
+			testIndex[0] = ZonedDateTime.of(1959, 1, 1, 0, 0, 0, 0, ZoneId.of(timeZone));
+			for(int i=1;i<testIndex.length;i++) {
+				testIndex[i] = testIndex[0].plusMonths(i);
+			}
+			TimeSeriesFactory tsFac = new TimeSeriesFactoryImpl();
+			TimeSeries trainTS = tsFac.createTimeSeries(TimeSeries.R_COMPATIBLE, "AirPassengersTrain"
+					, Seasonality.MONTH_OF_YEAR, trainData, trainIndex);
+			TimeSeries testTS = tsFac.createTimeSeries(TimeSeries.R_COMPATIBLE, "AirPassengersTest"
+					, Seasonality.MONTH_OF_YEAR, testData, testIndex);
+			
+			int horizon = 24;
+			ForecastEngineFactory fengFac = new ForecastEngineFactoryImpl();
+			RConfig rconf = new RConfig();
+			rconf.setrScriptsPath("/home/baddar/git/forecast4j/R/scripts");
+			RForecastEngine reng = (RForecastEngine) fengFac.createEngine(ForecastEngineFactory.REngine
+					,rconf);
+			ForecastResult fres = reng.regAutoArimaErr(trainTS, null, null, null, "month", horizon,timeZone);
+			
+			Assert.assertArrayEquals(fres.getMean().getData(), expectedForecastMean, 0.01);
+		} catch (RserveException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
 }

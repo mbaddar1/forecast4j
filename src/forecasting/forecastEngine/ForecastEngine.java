@@ -53,6 +53,6 @@ public interface ForecastEngine {
 	 */
 	ForecastResult regAutoArimaErr(TimeSeries ts,
 			TimeSeries[] trainingRegressors, TimeSeries[] futureRegressors,
-			AutoArimaParameters params, String timeIndexGranularity,int horizon)
+			AutoArimaParameters params, String timeIndexGranularity,int horizon,String timeZone)
 			throws Exception;
 }
